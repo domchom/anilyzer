@@ -56,7 +56,7 @@ def list_scans(experimentFolder, microscopeType):
 			if os.path.isdir(dirpath): # If the dirpath is a directory, print it and add it to scanList. If it's a file, do not add it.
 				print "dirpath is " + dirpath
 				scanList.append(dirpath)
-		return scanList # Returns scanList to run_it()
+
 
 	# If the microscope is "Olympus" type, the directories end in .oif.files, so .endswith needs to be used to find them
 	if microscopeType == "Olympus":
@@ -66,7 +66,8 @@ def list_scans(experimentFolder, microscopeType):
 				dirpath = os.path.join(experimentFolder, File)
 				print "dirpath is " + dirpath
 				scanList.append(dirpath)
-		return scanList # Returns scanList to run_it()
+	scanList.remove[saveFolder] #removes the saveFolder from the list 
+	return scanList # Returns scanList to run_it()
 
 # Make_hyperstack uses Bio-formats importer to import a hyperstack from an initiator file
 def make_hyperstack(basename, scan, microscopeType): # basename is defined in run_it() and is the name of the scan (not the full path)
