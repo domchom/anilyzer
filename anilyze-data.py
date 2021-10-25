@@ -66,7 +66,7 @@ def list_scans(experimentFolder, microscopeType):
 				dirpath = os.path.join(experimentFolder, File)
 				print "dirpath is " + dirpath
 				scanList.append(dirpath)
-	scanList.remove[saveFolder] #removes the saveFolder from the list 
+	scanList.remove(saveFolder) #removes the saveFolder from the list 
 	return scanList # Returns scanList to run_it()
 
 # Make_hyperstack uses Bio-formats importer to import a hyperstack from an initiator file
