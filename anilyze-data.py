@@ -1,6 +1,7 @@
 # @File(label = "Input directory", style = "directory") experimentFolder
 # @File(label = "Output directory", style = "directory") saveFolder
 
+
 """
 ##AUTHOR: Ani Michaud (Varjabedian)
 
@@ -100,8 +101,9 @@ def make_hyperstack(basename, scan, microscopeType): # basename is defined in ru
 		raise TypeError("No windows open! Bio-formats failed. Check metadata for completeness.")
 		return
 
-#Checks to see if multiple windows are open. There should only be one hyperstack. If there are multiple, it will close windows with a single frame (because it sees them as partial slices).
-# If you have single z-stack data but somehow also have a partial slice, this might close everything (seems like a rare situation though).
+	#Checks to see if multiple windows are open. There should only be one hyperstack. If there are multiple, it will close windows with a single frame (because it sees them as partial slices).
+	# If you have single z-stack data but somehow also have a partial slice, this might close everything (seems like a rare situation though).
+
 	if len(image_titles) > 1:
 		for i in image_titles:
 			print i
@@ -113,6 +115,7 @@ def make_hyperstack(basename, scan, microscopeType): # basename is defined in ru
 	except TypeError:
 		raise Exception("No windows open! Is this a single slice acquisition?")
 		return
+
 	imp = IJ.getImage()
 	imp.setTitle(basename + "_raw.tif")
 	return basename
