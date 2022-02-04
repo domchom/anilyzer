@@ -1,14 +1,11 @@
 # @File(label = "Input directory", style = "directory") experimentFolder
-# @Integer(label = "Slices to remove for difference movie", value = 4) differenceNumber
-#@ String (visibility=MESSAGE, value="Please select your channel colors. If you have one channel, assign it to Channel 1.") msg
-#@ String(label="Channel 1",choices={"Select", "Red", "Magenta", "Green", "Cyan", "Blue", "Grays"}, value = "Select", persist=false) ch1color
-#@ String(label="Channel 2",choices={"Select","Red", "Magenta", "Green", "Cyan", "Blue", "Grays"}, value = "Select", persist=false) ch2color
-#@ String(label="Channel 3",choices={"Select","Red", "Magenta", "Green", "Cyan", "Blue", "Grays"}, value = "Select", persist=false) ch3color
+# @File(label = "Output directory", style = "directory") saveFolder
+
 
 """
 ##AUTHOR: Ani Michaud (Varjabedian)
 
-## DESCRIPTION: This script is for automating common Fiji processing commands for imaging datasets. See README for the general overview.
+## DESCRIPTION: This branch is a stripped down version of the anilyzer. All it does is open hyperstacks, max project everything, and saves the max projection in an output folder.
 
 The organization of this code is as follows:
 
@@ -32,6 +29,8 @@ import datetime
 import fnmatch
 
 experimentFolder = str(experimentFolder) # Converts the input directory you chose to a path string that can be used later on
+
+saveFolder = str(saveFolder)
 
 # Microscope_check assesses the file structure of the experimentFolder and assigns a "microscope type" which gets passed to other functions. This helps with determining where certain files and directories should be located.
 def microscope_check(experimentFolder):
@@ -58,7 +57,7 @@ def list_scans(experimentFolder, microscopeType):
 			if os.path.isdir(dirpath): # If the dirpath is a directory, print it and add it to scanList. If it's a file, do not add it.
 				print "dirpath is " + dirpath
 				scanList.append(dirpath)
-		return scanList # Returns scanList to run_it()
+
 
 	# If the microscope is "Olympus" type, the directories end in .oif.files, so .endswith needs to be used to find them
 	if microscopeType == "Olympus":
@@ -68,36 +67,8 @@ def list_scans(experimentFolder, microscopeType):
 				dirpath = os.path.join(experimentFolder, File)
 				print "dirpath is " + dirpath
 				scanList.append(dirpath)
-		return scanList # Returns scanList to run_it()
-
-
-# make_directories takes an individual scan (passed from the run_it() function) and checks to see if a "processed" directory already exist inside the scan folder. If so, it overwrites it.
-def make_directories(scan):
-	print "Checking for output directories in ", scan
-	processed = os.path.join(scan, "processed") # makes full path to processed folder, inside the scan folder
-	raw = os.path.join(processed, "raw") # makes full path to raw folder, inside processed
-	diff = os.path.join(processed, "diff") # makes full path to diff folder, inside processed
-	MAX = os.path.join(processed, "MAX") # makes full path to MAX folder, inside processed
-	filteredMAX = os.path.join(MAX, "filteredMAX") # makes full path to filteredMAX, inside MAX
-	rawMAX = os.path.join(MAX, "rawMAX") # makes full path to rawMAX, inside MAX
-	filtered = os.path.join(processed, "filtered") # makes full path to filtered, inside processed
-	directories = [processed, raw, diff, filteredMAX, rawMAX, filtered] # a list of all the full paths you just made
-
-	#If a processed folder exists, it will erase and remake fresh folders
-	if os.path.exists(processed):
-		print "The directory", processed, "already exists! Overwriting..."
-		shutil.rmtree(processed)
-		for d in directories:
-			os.makedirs(d)
-			print d, "created"
-	else:
-		for d in directories:
-			os.makedirs(d)
-			print d, "created"
-
-	print "Finished creating directories!"
-	return directories # returns directories list to run_it()
-
+	scanList.remove(saveFolder) #removes the saveFolder from the list 
+	return scanList # Returns scanList to run_it()
 
 # Make_hyperstack uses Bio-formats importer to import a hyperstack from an initiator file
 def make_hyperstack(basename, scan, microscopeType): # basename is defined in run_it() and is the name of the scan (not the full path)
@@ -111,9 +82,7 @@ def make_hyperstack(basename, scan, microscopeType): # basename is defined in ru
 		initiatorFilePath = os.path.join(experimentFolder, initiatorFileName) # Gets the full path to the initiatorFile
 		print "Opening file ", initiatorFilePath
 
-	elif microscopeType == "Bruker": # With Bruker microscopes, you can initiate from the .xml file, or from a single TIF. I have found that initiation from the .xml file slows down the import on windows computers, so I got rid of .xml initiation (commented out below)
-		#xmlFile = basename + ".xml"
-		#xmlFile = os.path.join(scan, xmlFile) # Makes path to the xml file
+	elif microscopeType == "Bruker": # With Bruker microscopes, you can initiate from the .xml file, or from a single TIF. I have found that initiation from the .xml file slows down the import on windows computers
 		print "basename is ", basename # The basename doesn't need to be modified here, because there is no .oif.files suffix to remove (Thanks Bruker!)
 		initiatorFileName = basename + "_Cycle00001_Ch?_000001.ome.tif" # Defines the pattern to look for. The Ch? is because if you have one color, it's not always on CH1
 		initiatorFilePath = os.path.join(scan, initiatorFileName) # Gets the full path to the initiator file
@@ -165,26 +134,8 @@ def single_plane_check():
 
 	return singleplane
 
-# Runs the channel splitter if it detects multiple channels.
-def split_channels(directories, channels):
-	imp = IJ.getImage()
-	if channels >1:
-		IJ.run("Split Channels")
-	else:
-		print "Only one channel, bypassing channel splitter..."
-		imp = IJ.getImage()
-		windowName = imp.getTitle()
-		imp = imp.setTitle("C1-" + windowName) #just renames the window for continuity
-
-	# Saving the hyperstacks
-	image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
-	for i in image_titles:
-		imp = WindowManager.getImage(i)
-		windowName = imp.getTitle()
-		IJ.saveAsTiff(imp, os.path.join(directories[1], windowName)) # Save in raw folder
-
 # make_MAX checks for multi-z plane images and makes MAX projections if it finds them.
-def make_MAX(directories, x, singleplane): # singleplane is Boolean True/False
+def make_MAX(singleplane): # singleplane is Boolean True/False
 	image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
 
 	for i in image_titles:
@@ -193,7 +144,7 @@ def make_MAX(directories, x, singleplane): # singleplane is Boolean True/False
 			IJ.run(imp, "Z Project...", "projection=[Max Intensity] all")
 			imp = WindowManager.getImage("MAX_" + i)
 			windowName = imp.getTitle()
-			IJ.saveAsTiff(imp, os.path.join(directories[x], windowName)) #saves to appropriate MAX directory (rawMAX or filteredMAX). Passed from run_it()
+			IJ.saveAsTiff(imp, os.path.join(saveFolder,windowName)) #saves to saveFolder
 			imp = WindowManager.getImage(i) # Gets the original hyperstack
 			imp.changes = False # Answers "no" to the dialog asking if you want to save any changes
 			imp.close() # Closes the hyperstack
@@ -203,157 +154,6 @@ def make_MAX(directories, x, singleplane): # singleplane is Boolean True/False
 			windowName = imp.getTitle()
 			print "Single plane data detected. Skipping Z-projection for ", windowName
 
-# apply_LUT applies the LUT specified in the dialogue window and applies it to the appropriate channel
-def applyLut (channels, ch1color, ch2color, ch3color): # channels var is passed from run_it()
-	image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
-	print "Setting LUTs... "
-	windowname = image_titles[0] # The first item in the list should be C1
-	imp = WindowManager.getImage(windowname)
-	IJ.run(imp, ch1color, "") # Applies ch1color (from dialogue box) to the image
-	print "CH1 LUT set for ", image_titles[0]
-
-	if channels ==2: # CH1 already set, so just need to worry about CH2
-		windowname2 = image_titles[1]
-		imp2 = WindowManager.getImage(windowname2)
-		IJ.run(imp2, ch2color, "")
-		print "CH2 LUT set for ", image_titles[1]
-
-	elif channels == 3: # CH1 already set, so just need to worry about CH2 and CH3
-		windowname2 = image_titles[1]
-		imp2 = WindowManager.getImage(windowname2)
-		IJ.run(imp2, ch2color, "")
-		print "CH2 LUT set for ", image_titles[1]
-
-		windowname3 = image_titles[2]
-		imp3 = WindowManager.getImage(windowname3)
-		IJ.run(imp3, ch3color, "")
-		print "CH3 LUT set for ", image_titles[2]
-
-	else:
-		print "something went wrong with LUT assignment..."
-
-	print "Done setting LUTs"
-
-# merge_channels will merge the channels together after LUT assignment if there are more than 1.
-#If there is only 1 channel, it skips the merge
-def merge_channels(basename, channels, directories, x, suffix):
-	image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
-	if channels >1:
-		print "Found", channels, "channels...merging them together...."
-		if channels == 2:
-			IJ.run("Merge Channels...", "c1=[" + image_titles[0] + "] c2=[" + image_titles[1] + "] create")
-		if channels == 3:
-			IJ.run("Merge Channels...", "c1=[" + image_titles[0] + "] c2=[" + image_titles[1] + "] c3=[" + image_titles[2] + "] create")
-		imp = IJ.getImage() # gets the resulting image
-		imp.setTitle("Merged_" + basename + suffix)
-		windowName = imp.getTitle()
-		IJ.saveAsTiff(imp, os.path.join(directories[x], windowName)) # saves to output location x. Passed from run_it()
-		IJ.run("Close All")
-	else:
-		print "Only 1 channel, skipping merge..."
-		IJ.run("Close All")
-	print "Closing all files..."
-
-# median_filter runs a median filter with kernel = 1 on the raw hyperstacks
-def median_filter(rawFiles, directories, x): # all arguments are passed from run_it()
-	for f in rawFiles:
-		if fnmatch.fnmatch(f, "C?*"): # pattern matching to only open the C1, C2 and C3 files (skips merge)
-			IJ.open(os.path.join(directories[1], f))
-
-	image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
-	for i in image_titles:
-		imp = WindowManager.getImage(i)
-		IJ.run(imp, "Median...", "radius=1 stack")
-		windowName = WindowManager.getImage(i).getTitle().replace("raw", "filtered") # save as "*_filtered.tif" extension
-		imp.setTitle(windowName)
-		IJ.saveAsTiff(imp, os.path.join(directories[x], windowName)) # saves to filtered directory. Passed the directory from run_it()
-
-
-# For make_difference, it will remove slices to make a difference movie, based on the number you put in the beginning dialogue box.
-# This function looks in either filteredMAX or filtered, depending on if the data is single plane. You can change what data you want to us in run_it by altering x
-def make_difference(directories, x, differenceNumber, singleplane):
-	for file in os.listdir(directories[x]): # looks in the folder and makes a list of the directories
-		if singleplane == False: # if data is multi-z plane, looks for the MAX projections
-			if fnmatch.fnmatch(file, "MAX*"):
-				IJ.open(os.path.join(directories[x], file))
-		elif singleplane == True: # if singleplane data, looks for C1, C2 and C3 hyperstacks (there are no MAX projections)
-			if fnmatch.fnmatch(file, "C?*"):
-				IJ.open(os.path.join(directories[x], file))
-
-	image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
-
-	for i in image_titles:
-		imp = WindowManager.getImage(i)
-		windowName = imp.getTitle()
-		if imp.getNFrames() == 1: # if it is a single timepoint, will raise exception and quit
-			imp.close()
-			raise Exception("Single timepoint data. Cannot create difference movies.")
-			return
-		else:
-			imp.setT(1) # sets the cursor at the first frame
-			dup = imp.duplicate()
-			dup.show() # shows the duplicate
-			dup.setTitle(windowName + "_dup") # renames the duplicate
-
-
-		differenceNumberString = str(differenceNumber) # turns the integer input into a string
-
-		# the range is differenceNumber+1 because range goes up to but does not include the last value. So a range of (1,3) Would only check n = 1, 2
-		for n in range(1, differenceNumber+1):
-			if n >= 1:
-				IJ.run(imp, "Delete Slice", "")
-
-		dup = WindowManager.getImage(windowName + "_dup")
-		IJ.run(dup,"Reverse", "") # reverse the array so that the slices in the back become the front
-
-		for n in range(1, differenceNumber+1):
-			if n >= 1:
-				IJ.run(dup, "Delete Slice", "")
-
-		IJ.run(dup, "Reverse", "") # reverse the array back to native orientation
-		calc = ImageCalculator()
-		impDiff = calc.calculate("Subtract create stack", imp, dup) # subtract the imp - dup
-		impDiff = WindowManager.getImage("Result of "+ windowName) # selects the result
-		windowName = impDiff.getTitle().replace("Result of ", "Diff" + differenceNumberString + "-")
-		impDiff.setTitle(windowName) # renames it to include the differenceNumber
-
-		IJ.saveAsTiff(impDiff, os.path.join(directories[2], windowName)) # saves in diff folder
-		impDiff.changes = False # Answers "no" to the dialog asking if you want to save any changes
-		imp.changes = False # Answers "no" to the dialog asking if you want to save any changes
-		dup.changes = False # Answers "no" to the dialog asking if you want to save any changes
-		impDiff.close()
-		imp.close()
-		dup.close()
-
-# A script to move files around and delete things you don't want
-def clean_up(directories, singleplane):
-
-	# First check for empty directories and delete them
-	for d in directories:
-		if len(os.listdir(d)) == 0:
-			print "Directory ", d, " is empty"
-			shutil.rmtree(d)
-		else:
-			print "Directory ", d, "is not empty"
-
-	# Additionally, if the data is z-stacks, delete the "filtered" directory (because filtered data will be in filteredMAX)
-	if singleplane == False and os.path.exists(directories[5]):
-		print "Deleting " + directories[5]
-		shutil.rmtree(directories[5])
-
-	# If the data is single plane, delete the whole MAX folder and also the filtered individual channels
-	elif singleplane == True:
-		print "Deleting MAX directory..."
-		MAX = os.path.join(directories[0], "MAX")
-		shutil.rmtree(MAX)
-		#print "Deleting filtered channels..."
-		#for file in glob.glob(os.path.join(directories[5], "C?*")):
-			#os.remove(os.path.join(directories[5], file))
-
-	# DOWN HERE YOU CAN ADD OTHER DIRECTORIES THAT YOU NEVER USE AND WANT TO DELETE
-	# if os.path.exists(directories[4]): # this checks for rawMAX
-	# 	shutil.rmtree(directories[4]) # this removes rawMAX
-
 # run_it is the main function that calls all the other functions
 # This is the place to comment out certain function calls if you don't have a need for them
 def run_it():
@@ -362,8 +162,7 @@ def run_it():
 	now = datetime.datetime.now()
 	errorFile = open(errorFilePath, "w")
 	errorFile.write("\n" + now.strftime("%Y-%m-%d %H:%M") + "\n")
-	errorFile.write("#### anilyze-data  ####" + "\n")
-	#errorFile.write("Here we go...\n")
+	errorFile.write("#### anilyze-data ####" + "\n")
 	errorFile.close()
 
 	#Runs microscope_check and defines the scanList accordingly
@@ -378,12 +177,12 @@ def run_it():
 		scanList = list_scans(experimentFolder, microscopeType)
 		print "The returned scanList is", len(scanList), "item(s) long"
 
-	# For each scan in the scanList, call the following functions
+	# For each scan in the scanList, call the following functions:
 	for scan in scanList:
 		try:
-			directories = make_directories(scan) # make the directories
 			basename = os.path.basename(scan) # get the scan name (basename)
 
+			#start new line in errorFile
 			errorFile = open(errorFilePath, "a")
 			errorFile.write("\n \n -- Processing " + basename + " --" + "\n")
 			errorFile.close()
@@ -392,44 +191,15 @@ def run_it():
 			imp = IJ.getImage() # select the open image
 			channels = imp.getNChannels() #gets the number of channels
 			print "The number of channels is", channels
-			singleplane = single_plane_check()
+			
+			singleplane = single_plane_check() #checks to see if sinegle z-plane
 			print "The returned value of singleplane is ", singleplane
-			split_channels(directories, channels) # split the hyperstack into channels (skips if channels == 1)
-			make_MAX(directories, 4, singleplane) # make max projection (skips if singleplane == True)
-			applyLut(channels, ch1color, ch2color, ch3color) # apply the user specified LUT(s)
+			
+			make_MAX(singleplane) # make max projection (skips if singleplane == True)
 
-			# calls merge_channels for raw data (skips if singleplane == True)
-			print "Making raw merge..."
-			if singleplane == False:
-				merge_channels(basename, channels, directories, 4, "_raw") # makes rawMAX merge (4 = rawMax)
-			elif singleplane == True:
-				merge_channels(basename, channels, directories, 1, "_raw") # for single z-plane (1 = raw)
+			IJ.run("Close All")
 
-			## makes filtered images. Comment out if you dont want to make any.
-			#print "Making filtered movies..."
-			#rawFiles = os.listdir(directories[1]) # makes a list of the files in "raw"
-			#median_filter(rawFiles, directories, 5) # saves output in filtered
-			#print "making filtered max" # max projection of filtered data
-			#make_MAX(directories, 3, singleplane) # makes filteredMAX (3 = filteredMAX)
-			#applyLut(channels, ch1color, ch2color, ch3color) # apply the user specified LUT(s)
-			#print "Making filtered merge..."
-
-			## # calls merge_channels for filtered data (skips if singleplane == True)
-			#if singleplane == False:
-			#	merge_channels(basename, channels, directories, 3, "_filtered") # makes filteredMAX merge
-			#elif singleplane == True:
-			#	merge_channels(basename, channels, directories, 5, "_filtered") # for single z-plane (5 = filtered)
-
-			# Make difference movies. Uses either filtered MAX projections or filtered hyperstacks (if singleplane == True)
-			if differenceNumber >0:
-				print "Making difference movies..."
-				if singleplane == False:
-					make_difference(directories, 4, differenceNumber, singleplane) # passes rawMAX directory. Change to 3 if you want filteredMAX
-				elif singleplane == True:
-					make_difference(directories, 1, differenceNumber, singleplane) # passes raw directory for raw hyperstacks. Change to 5 if you want filtered
-
-			clean_up(directories, singleplane)	# clean up directory structure
-
+			#finishes errorFile
 			errorFile = open(errorFilePath, "a")
 			errorFile.write("Congrats, it was successful!\n")
 			errorFile.close()
@@ -437,20 +207,20 @@ def run_it():
 
 		except:  #if there is an exception to the above code, create or append to an errorFile with the traceback
 			print "Error with ", basename, "continuing on..."
-
 			errorFile = open(errorFilePath, "a")
 			errorFile.write("\n" + now.strftime("%Y-%m-%d %H:%M") + "\n") #writes the date and time
-			#errorFile.write("Error detected...\n")
 			errorFile.write("Error with " + basename + "\n" + "\n")
 			traceback.print_exc(file = errorFile) # writes the error traceback to the file
 			errorFile.close()
+			
 			IJ.run("Close All")
-			#clean_up(directories, singleplane)	# clean up directory structure
 			IJ.freeMemory() # runs garbage collector
 			continue # continue on with the next scan, even if the current one threw an error
-
+	
+	#close out errorFile
 	errorFile = open(errorFilePath, "a")
 	errorFile.write("\nDone with script.\n")
 	errorFile.close()
+
 run_it()
 print "Done with script"
