@@ -1,5 +1,4 @@
 # @File(label = "Input directory", style = "directory") experimentFolder
-# @File(label = "Output directory", style = "directory") saveFolder
 
 
 """
@@ -30,7 +29,13 @@ import fnmatch
 
 experimentFolder = str(experimentFolder) # Converts the input directory you chose to a path string that can be used later on
 
-saveFolder = str(saveFolder)
+saveFolder= os.path.join(experimentFolder, "processed")
+if os.path.isdir(saveFolder) ==True:
+	shutil.rmtree(saveFolder)
+
+os.makedirs(saveFolder)
+
+
 
 # Microscope_check assesses the file structure of the experimentFolder and assigns a "microscope type" which gets passed to other functions. This helps with determining where certain files and directories should be located.
 def microscope_check(experimentFolder):
@@ -67,7 +72,8 @@ def list_scans(experimentFolder, microscopeType):
 				dirpath = os.path.join(experimentFolder, File)
 				print "dirpath is " + dirpath
 				scanList.append(dirpath)
-	scanList.remove(saveFolder) #removes the saveFolder from the list 
+	
+	#scanList.remove(saveFolder) #removes the saveFolder from the list 
 	return scanList # Returns scanList to run_it()
 
 # Make_hyperstack uses Bio-formats importer to import a hyperstack from an initiator file
