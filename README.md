@@ -21,10 +21,10 @@ As stated above, this script assumes a particular file heirarchy, that is either
 2. The script determines the microscope type from the file structure.
 3. The script gets a list of all the movies in the folder.
 4. For each movie in the list the script:
-  * Imports the file using bioformats importer.
-  * Checks to see if the movie is a multi-z stack or single optical plane.
-  * If multi-z, the script makes a maximum projection. If not, the script skips this step.
-  * The max projection (or single plane image) is then saved to a folder called "processed". 
+   * Imports the file using bioformats importer.
+   * Checks to see if the movie is a multi-z stack or single optical plane.
+   * If multi-z, the script makes a maximum projection. If not, the script skips this step.
+   * The max projection (or single plane image) is then saved to a folder called "processed". 
 6. If the script encounters an error, it tries it's best to log it in the error file and move on.
 7. When the script is finished, it will print "Done with Script" to the terminal window.
 
