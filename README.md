@@ -3,10 +3,10 @@
 This script uses Fiji/ImageJ to batch import, max project (if applicable) and save multi-z or single optical plane movies. It was built to deal with data structure from Bruker Prairie microscopes or Olympus Fluoview microscopes, however can be pretty easily modified to accomodate others. 
 
 ## Dependencies
-* As stated above, this script assumes a particular file heirarchy, that is either:
-  * **Bruker Style:** A parent directory containing sub-directories for each movie. Inside each sub-directory, individual .tif files ending in a suffix of *"_Cycle0000?_Ch?_00000?.ome.tif"* and a single .xml file containing metadata.
-    * **NOTE:** If using the Bruker pipeline, your sub-directories **MUST** have the same base name as the .tif and .xml files inside! If you wish to rename things, you must do it after you have used this script. 
-  * **Olympus Style:** A parent directory containing sub-directories for each movie, along with a single .oif file.  
+As stated above, this script assumes a particular file heirarchy, that is either:
+* **Bruker Style:** A parent directory containing sub-directories for each movie. Inside each sub-directory, individual .tif files ending in a suffix of *"_Cycle0000?_Ch?_00000?.ome.tif"* and a single .xml file containing metadata.
+  * **NOTE:** If using the Bruker pipeline, your sub-directories **MUST** have the same base name as the .tif and .xml files inside! If you wish to rename things, you must do it after you have used this script. 
+* **Olympus Style:** A parent directory containing sub-directories for each movie, along with a single .oif file.  
 
 
 ## Steps to run
