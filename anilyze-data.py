@@ -29,7 +29,7 @@ import fnmatch
 
 experimentFolder = str(experimentFolder) # Converts the input directory you chose to a path string that can be used later on
 
-saveFolder= os.path.join(experimentFolder, "processed")
+saveFolder = os.path.join(experimentFolder, "processed")
 if os.path.isdir(saveFolder) ==True:
 	shutil.rmtree(saveFolder)
 
@@ -73,7 +73,7 @@ def list_scans(experimentFolder, microscopeType):
 				print "dirpath is " + dirpath
 				scanList.append(dirpath)
 	
-	scanList.remove(saveFolder) #removes the saveFolder from the list 
+	#scanList.remove(saveFolder) #removes the saveFolder from the list 
 	return scanList # Returns scanList to run_it()
 
 # Make_hyperstack uses Bio-formats importer to import a hyperstack from an initiator file
