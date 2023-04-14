@@ -30,12 +30,10 @@ import fnmatch
 experimentFolder = str(experimentFolder) # Converts the input directory you chose to a path string that can be used later on
 
 saveFolder = os.path.join(experimentFolder, "processed")
-if os.path.isdir(saveFolder) ==True:
+if os.path.isdir(saveFolder) == True:
 	shutil.rmtree(saveFolder)
 
 os.makedirs(saveFolder)
-
-
 
 # Microscope_check assesses the file structure of the experimentFolder and assigns a "microscope type" which gets passed to other functions. This helps with determining where certain files and directories should be located.
 def microscope_check(experimentFolder):
@@ -223,10 +221,20 @@ def run_it():
 			IJ.freeMemory() # runs garbage collector
 			continue # continue on with the next scan, even if the current one threw an error
 	
+	new_folder = os.path.join(experimentFolder, 'scope_folders')
+	if not os.path.exists(new_folder):
+		os.mkdir(new_folder)
+
+	# Move all existing folders into the new folder
+	for folder in os.listdir(experimentFolder):
+		folder_path = os.path.join(experimentFolder, folder)
+		if os.path.isdir(folder_path) and folder != new_folder and folder != 'processed':
+			shutil.move(folder_path, new_folder)
+
 	#close out errorFile
 	errorFile = open(errorFilePath, "a")
 	errorFile.write("\nDone with script.\n")
 	errorFile.close()
-
+	
 run_it()
 print "Done with script"
