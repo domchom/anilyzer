@@ -1,240 +1,255 @@
-# @File(label = "Input directory", style = "directory") experimentFolder
-
-
-"""
-##AUTHOR: Ani Michaud (Varjabedian)
-
-## DESCRIPTION: This branch is a stripped down version of the anilyzer. All it does is open hyperstacks, max project everything, and saves the max projection in an output folder.
-
-The organization of this code is as follows:
-
-1. Script parameters (at the top, preceded by a "#@") that gather information for the dialogue box
-2. Import statements for all the modules needed
-3. All of the main functions for processing data
-4. The run_it() function, which sets up the error logging, and then calls all of the other processing functions. It should eventually just be in it's own file, but I like having everything where you can see it.
-
-If you want to know the general flow of events, check the order of calls in the run_it() function. If you want to skip certain steps, comment them out in the run_it() function. Although, be aware that some functions pass arguments to each other, and commenting out certain functions can result in errors. It's best to read the particular function before you comment it out to make sure you avoid this.
-
-For more information and up-to-date changes, visit the GitHub repository: https://github.com/anivarj/anilyzer
+# @File(label = "Input directory", style = "directory") input_dir
 
 """
+AUTHOR: Ani Michaud (Varjabedian)
+DESCRIPTION: This branch of code is a simplified version of Anilyzer. Its primary function is to open hyperstacks, perform a maximum projection on all images, and save the output in a designated folder.
 
-# Importing modules and other shit
-import os, sys, traceback, shutil, glob
-from ij import IJ, WindowManager, ImagePlus
-from ij.gui import GenericDialog
-from ij.plugin import ImageCalculator
+The code is organized in the following manner:
+
+    Script parameters are located at the top, preceded by a "#@" symbol, to gather information for the dialogue box.
+    Import statements for all necessary modules are included.
+    The main functions for processing data are defined.
+    The "run_it()" function is implemented, which sets up error logging and calls all the other processing functions. This function should eventually be moved to its own file, but for now, it is kept in the same file for ease of access.
+
+To understand the overall flow of events, check the order of calls in the "run_it()" function. If you wish to skip certain steps, you can comment them out in the "run_it()" function, but please note that some functions pass arguments to each other, so commenting out specific functions may result in errors. It's best to read the individual function before commenting it out to avoid any potential errors.
+
+For more information and the latest updates, please visit the GitHub repository at: https://github.com/anivarj/anilyzer.
+"""
+import os
+import glob
+import shutil
 import datetime
-import fnmatch
+import traceback
+from ij import IJ, WindowManager
 
-experimentFolder = str(experimentFolder) # Converts the input directory you chose to a path string that can be used later on
+# Convert input directory to string
+input_dir = str(input_dir)
 
-saveFolder = os.path.join(experimentFolder, "processed")
-if os.path.isdir(saveFolder) == True:
-	shutil.rmtree(saveFolder)
+def microscope_check(input_dir):
+    """
+    Check the microscope type by looking for ".oif" files in the input directory.
+    If one or more ".oif" files are found, assume the microscope is an Olympus.
+    Otherwise, assume the microscope is a Bruker.
 
-os.makedirs(saveFolder)
+    Args:
+    - input_dir (str): The path to the directory to check for ".oif" files.
 
-# Microscope_check assesses the file structure of the experimentFolder and assigns a "microscope type" which gets passed to other functions. This helps with determining where certain files and directories should be located.
-def microscope_check(experimentFolder):
-	#If it finds .oif files inside the main folder, it calls the microscope "Olympus"
-	if any(File.endswith(".oif") for File in os.listdir(experimentFolder)):
-		print(".oif files present, running Olympus pipeline")
-		microscopeType = "Olympus"
-		return microscopeType #returns microscopeType to run_it()
-	else:
-		#If there are no .oif files in the main folder, it calls the microscope "Bruker"
-		print("No .oif files present, running Bruker pipeline")
-		microscopeType = "Bruker"
-		return microscopeType #returns microscopeType to run_it()
+    Returns:
+    - microscope_type (str): The type of microscope detected.
+    """
+    for file in os.listdir(input_dir):
+        if os.path.splitext(file)[-1] == ".oif":
+            microscope_type = "Olympus"
+            break
+    else:
+        microscope_type = "Bruker"
+    return microscope_type
 
-# list_scans gets a list of all scan folders inside the experimentFolder you selected, and saves them as a list called scanList.
-def list_scans(experimentFolder, microscopeType):
-	scanList = [] # Makes an empty list
+def list_scans(input_dir, microscope_type):
+    """
+    List all the scans in the input directory, based on the microscope type.
+    For Bruker microscopes, scans are directories with no extension.
+    For Olympus microscopes, scans are directories ending with ".oif.files".
 
-	# This section screens out text files and other things that might be in the main experimentFolder, and only makes a list of the actual scan directories
-	# For Bruker microscopes, the scan directories are plain, so os.isdir is used to look for them
-	if microscopeType == "Bruker":
-		for File in sorted(os.listdir(experimentFolder)):
-			dirpath = os.path.join(experimentFolder, File) # Makes a complete path to the file
-			if os.path.isdir(dirpath): # If the dirpath is a directory, print it and add it to scanList. If it's a file, do not add it.
-				print "dirpath is " + dirpath
-				scanList.append(dirpath)
+    Args:
+    - input_dir (str): The path to the directory containing the scans.
+    - microscope_type (str): The type of microscope used to acquire the scans.
 
+    Returns:
+    - scan_list (list): A list of directories containing the scans.
+    """
+    if microscope_type == "Bruker":
+        # Use glob to find directories with no extension
+        file_pattern = os.path.join(input_dir, "*")
+        scan_list = [os.path.join(input_dir, f) for f in glob.glob(file_pattern) if os.path.isdir(f)]
+    elif microscope_type == "Olympus":
+        # Use glob to find directories ending with ".oif.files"
+        file_pattern = os.path.join(input_dir, "*.oif.files")
+        scan_list = glob.glob(file_pattern)
+    return scan_list
 
-	# If the microscope is "Olympus" type, the directories end in .oif.files, so .endswith needs to be used to find them
-	if microscopeType == "Olympus":
-		oifList = [] # This doesn't look like it was used, so I should delete it in the future once I have verified this.
-		for File in sorted(os.listdir(experimentFolder)):
-			if File.endswith(".oif.files"): # If the item ends with .oif.files, make the complete path and append it to scanList
-				dirpath = os.path.join(experimentFolder, File)
-				print "dirpath is " + dirpath
-				scanList.append(dirpath)
-	
-	#scanList.remove(saveFolder) #removes the saveFolder from the list 
-	return scanList # Returns scanList to run_it()
+def load_initiator_file(input_dir, scan, microscope_type, basename):
+    """
+    Load the initiator file for a given scan, based on the microscope type.
+    For Olympus microscopes, the initiator file is the .oif file.
+    For Bruker microscopes, the initiator file is the first TIF file in the directory.
 
-# Make_hyperstack uses Bio-formats importer to import a hyperstack from an initiator file
-def make_hyperstack(basename, scan, microscopeType): # basename is defined in run_it() and is the name of the scan (not the full path)
+    Args:
+    - scan (str): The path to the scan directory.
+    - microscope_type (str): The type of microscope used to acquire the scan.
+    - basename (str): The basename of the scan.
 
-	# Defines an "initator file" to give bioformats importer, and also modifies basename (which has an .oif.files extension) to make the scan name
-	if microscopeType == "Olympus":
-		initiatorFileName = os.path.splitext(basename) [0] # Removes .file extension from the .oif.file path to get the name of the .oif initiator file
-		basename = os.path.splitext(initiatorFileName) [0] # Removes .oif extension from initiatorFile to get the name of the scan (for naming windows and stuff)
-		print "basename is ", basename
-		print ".oif file is ",  initiatorFileName # This is the file that will get passed to bioformats importer
-		initiatorFilePath = os.path.join(experimentFolder, initiatorFileName) # Gets the full path to the initiatorFile
-		print "Opening file ", initiatorFilePath
+    Returns:
+    - initiator_file_path (str): The path to the initiator file.
+    """
+    if microscope_type == "Olympus":
+        # Use the .oif file as initiator
+        initiator_file_name = os.path.splitext(basename)[0]
+        initiator_file_path = os.path.join(input_dir, initiator_file_name)
+    elif microscope_type == "Bruker":
+        # Use the first TIF file as initiator
+        initiator_file_name = basename + "_Cycle00001_Ch?_000001.ome.tif"
+        initiator_file_path = glob.glob(os.path.join(scan, initiator_file_name))
+        if not initiator_file_path:
+            raise TypeError("No initiator file found for " + basename)
+        initiator_file_path = initiator_file_path[0]
+    else:
+        raise TypeError("Unknown microscope type " + microscope_type)
+    return initiator_file_path
 
-	elif microscopeType == "Bruker": # With Bruker microscopes, you can initiate from the .xml file, or from a single TIF. I have found that initiation from the .xml file slows down the import on windows computers
-		print "basename is ", basename # The basename doesn't need to be modified here, because there is no .oif.files suffix to remove (Thanks Bruker!)
-		initiatorFileName = basename + "_Cycle00001_Ch?_000001.ome.tif" # Defines the pattern to look for. The Ch? is because if you have one color, it's not always on CH1
-		initiatorFilePath = os.path.join(scan, initiatorFileName) # Gets the full path to the initiator file
-		print "initiatorFilePath ", initiatorFilePath
-		initiatorFilePath = glob.glob(initiatorFilePath) # Looks for the first file in the folder. If there are more than one channel, it makes a list of them.
-		initiatorFilePath = initiatorFilePath[0] # Takes the first item in the list. This is the file that will get passed to bioformats importer
-		print "Opening file", initiatorFilePath
+def make_hyperstack(initiator_file_path, basename):
+    """
+    Create a hyperstack from the initiator file using ImageJ and Bio-Formats.
 
-	IJ.run("Bio-Formats Importer", "open=[" + initiatorFilePath + "] color_mode=Grayscale concatenate_series open_all_series quiet rois_import=[ROI manager] view=Hyperstack stack_order=XYCZT")
-	print "File opened"
+    Args:
+    - initiator_file_path (str): The path to the initiator file.
+    - basename (str): The basename of the scan.
 
-	# Get a list of the windows that are open
-	try:
-		image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
-	except TypeError:
-		raise TypeError("No windows open! Bio-formats failed. Check metadata for completeness.")
-		return
+    Returns:
+    None.
+    """
+    # Import the initiator file as a hyperstack using Bio-Formats
+    IJ.run("Bio-Formats Importer", "open=[" + initiator_file_path + "] color_mode=Grayscale concatenate_series open_all_series quiet rois_import=[ROI manager] view=Hyperstack stack_order=XYCZT")
+    
+    # Check to see if multiple windows are open. 
+    image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
+    if len(image_titles) > 1:
+        for i in image_titles:
+            imp = WindowManager.getImage(i)
+            if imp.getNFrames() == 1: # If it is a single frame, close it (because it sees them as partial slices)
+                imp.close()
+        image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
+        if len(image_titles) != 1:
+            raise Exception("No windows open! Is this a single slice acquisition?")
+    
+    imp = IJ.getImage()
+    imp.setTitle(basename + "_raw.tif")
 
-	#Checks to see if multiple windows are open. There should only be one hyperstack. If there are multiple, it will close windows with a single frame (because it sees them as partial slices).
-	# If you have single z-stack data but somehow also have a partial slice, this might close everything (seems like a rare situation though).
-
-	if len(image_titles) > 1:
-		for i in image_titles:
-			print i
-			imp = WindowManager.getImage(i)
-			if imp.getNFrames() == 1: # If it is a partial slice, will close it
-				imp.close()
-	try:
-		image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
-	except TypeError:
-		raise Exception("No windows open! Is this a single slice acquisition?")
-		return
-
-	imp = IJ.getImage()
-	imp.setTitle(basename + "_raw.tif")
-	return basename
-
-# checks for single plane acquisition. Don't need since you ask up front
 def single_plane_check():
-	print "Checking for z-planes..."
-	imp = IJ.getImage()
-	if imp.getNSlices() > 1:
-		print "The number of z-planes is ", imp.getNSlices()
-		singleplane = False
+    '''
+    Checks if the currently selected image in ImageJ is a single z-plane or not. 
+    It returns a boolean value indicating whether the image is a single z-plane or not.
 
-	elif imp.getNSlices() == 1:
-		print "The number of z-planes is ", imp.getNSlices()
-		singleplane = True
+    Args: 
+    None.
 
-	return singleplane
+    Returns:
+    - singleplane (bool): True if the selected image is a single z-plane, False otherwise.
+    '''
+    imp = IJ.getImage()
+    singleplane = True if imp.getNSlices() == 1 else False
+    return singleplane
 
-# make_MAX checks for multi-z plane images and makes MAX projections if it finds them.
-def make_MAX(singleplane): # singleplane is Boolean True/False
-	image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
+def make_MAX(singleplane, save_folder):
+    """
+    Create a maximum intensity projection of each image window and save it as a separate TIFF file.
 
-	for i in image_titles:
-		imp = WindowManager.getImage(i)
-		if singleplane == False: # If the data is not single z-plane, runs max projection
-			IJ.run(imp, "Z Project...", "projection=[Max Intensity] all")
-			imp = WindowManager.getImage("MAX_" + i)
-			windowName = imp.getTitle()
-			IJ.saveAsTiff(imp, os.path.join(saveFolder,windowName)) #saves to saveFolder
-			imp = WindowManager.getImage(i) # Gets the original hyperstack
-			imp.changes = False # Answers "no" to the dialog asking if you want to save any changes
-			imp.close() # Closes the hyperstack
+    Args:
+    - singleplane (bool): Whether the images are single-plane or multiplane.
 
-		# If the data is single plane, it skipes projection and moves to LUT setting
-		elif singleplane == True:
-			windowName = imp.getTitle()
-			print "Single plane data detected. Skipping Z-projection for ", windowName
+    Returns:
+    None.
+    """
+    image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
 
-# run_it is the main function that calls all the other functions
-# This is the place to comment out certain function calls if you don't have a need for them
-def run_it():
-	# Make an error log file that can be written to
-	errorFilePath = os.path.join(experimentFolder, "errorFile.txt")
-	now = datetime.datetime.now()
-	errorFile = open(errorFilePath, "w")
-	errorFile.write("\n" + now.strftime("%Y-%m-%d %H:%M") + "\n")
-	errorFile.write("#### anilyze-data ####" + "\n")
-	errorFile.close()
+    for title in image_titles:
+        imp = WindowManager.getImage(title)
+        
+        if singleplane == False:
+            IJ.run(imp, "Z Project...", "projection=[Max Intensity] all") # Run Z projection and save MAX image
+            max_imp = WindowManager.getImage("MAX_" + title)
+            windowName = max_imp.getTitle()
+            IJ.saveAsTiff(max_imp, os.path.join(save_folder, windowName))
+            imp = WindowManager.getImage(title)
+            imp.changes = False # Answers "no" to the dialog asking if you want to save any changes
+            imp.close() # Closes the hyperstack
+        
+        else:
+            windowName = imp.getTitle()
+            print "Single plane data detected. Skipping Z-projection for ", windowName
 
-	#Runs microscope_check and defines the scanList accordingly
-	microscopeType = microscope_check(experimentFolder)
 
-	# Call list_scans and pass it the microscopeType variable. Gets the scanList
-	if microscopeType == "Olympus":
-		scanList = list_scans(experimentFolder, microscopeType)
-		print "The returned scanList is", len(scanList), "item(s) long"
+def run_it(input_dir):
+    """
+    Runs the main pipeline for processing images from either an Olympus or Bruker microscope.
 
-	elif microscopeType == "Bruker":
-		scanList = list_scans(experimentFolder, microscopeType)
-		print "The returned scanList is", len(scanList), "item(s) long"
+    Creates an error log file and determines the microscope type and scan list.
+    Creates an output directory for processed images and for each scan in the scan list,
+    it calls the make_hyperstack() and make_MAX() functions.
+    If an error occurs, it writes the error message to the error log file and continues with the next scan.
+    After all scans are processed, it moves all existing folders into a new folder and closes the error log file.
+    """
+    # Create an error log file
+    error_file_path = os.path.join(input_dir, "errorFile.txt")
+    now = datetime.datetime.now()
+    with open(error_file_path, "w") as error_file:
+        error_file.write("\n" + now.strftime("%Y-%m-%d %H:%M") + "\n")
+        error_file.write("#### anilyze-data ####" + "\n")
 
-	# For each scan in the scanList, call the following functions:
-	for scan in scanList:
-		try:
-			basename = os.path.basename(scan) # get the scan name (basename)
+    # Determine microscope type and scan list
+    microscope_type = microscope_check(input_dir)
+    scan_list = list_scans(input_dir, microscope_type)
+    print "The returned scanList is", len(scan_list), "item(s) long"
+    
+    # Create output directory for processed images
+    save_folder = os.path.join(input_dir, "processed")
+    if not os.path.exists(save_folder):
+        os.mkdir(save_folder)
 
-			#start new line in errorFile
-			errorFile = open(errorFilePath, "a")
-			errorFile.write("\n \n -- Processing " + basename + " --" + "\n")
-			errorFile.close()
+    for scan in scan_list:
+        try:
+            basename = os.path.basename(scan)
+            print "Processing " + basename
+            with open(error_file_path, "a") as error_file:
+                error_file.write("\n \n -- Processing " + basename + " --" + "\n")
 
-			make_hyperstack(basename, scan, microscopeType) # open the hyperstack
-			imp = IJ.getImage() # select the open image
-			channels = imp.getNChannels() #gets the number of channels
-			print "The number of channels is", channels
-			
-			singleplane = single_plane_check() #checks to see if sinegle z-plane
-			print "The returned value of singleplane is ", singleplane
-			
-			make_MAX(singleplane) # make max projection (skips if singleplane == True)
+            # Load initiator file and create hyperstack
+            initiator_file_path = load_initiator_file(input_dir, scan, microscope_type, basename)
+            make_hyperstack(initiator_file_path, basename)
 
-			IJ.run("Close All")
+            # Create MAX projection and save as TIFF file
+            singleplane = single_plane_check()
+            make_MAX(singleplane, save_folder)
 
-			#finishes errorFile
-			errorFile = open(errorFilePath, "a")
-			errorFile.write("Congrats, it was successful!\n")
-			errorFile.close()
-			IJ.freeMemory() # runs garbage collector
+            # Close all open windows and free memory
+            IJ.run("Close All")
+            IJ.freeMemory()
 
-		except:  #if there is an exception to the above code, create or append to an errorFile with the traceback
-			print "Error with ", basename, "continuing on..."
-			errorFile = open(errorFilePath, "a")
-			errorFile.write("\n" + now.strftime("%Y-%m-%d %H:%M") + "\n") #writes the date and time
-			errorFile.write("Error with " + basename + "\n" + "\n")
-			traceback.print_exc(file = errorFile) # writes the error traceback to the file
-			errorFile.close()
-			
-			IJ.run("Close All")
-			IJ.freeMemory() # runs garbage collector
-			continue # continue on with the next scan, even if the current one threw an error
-	
-	new_folder = os.path.join(experimentFolder, 'scope_folders')
-	if not os.path.exists(new_folder):
-		os.mkdir(new_folder)
+            print "Processing " + basename + " was successful!"
+            with open(error_file_path, "a") as error_file:
+                error_file.write("Congrats, it was successful!\n")
 
-	# Move all existing folders into the new folder
-	for folder in os.listdir(experimentFolder):
-		folder_path = os.path.join(experimentFolder, folder)
-		if os.path.isdir(folder_path) and folder != new_folder and folder != 'processed':
-			shutil.move(folder_path, new_folder)
+        except Exception as e:
+            print "Error with ", basename, "continuing on..."
+            with open(error_file_path, "a") as error_file:
+                error_file.write("\n" + now.strftime("%Y-%m-%d %H:%M") + "\n")
+                error_file.write("Error with " + basename + "\n" + "\n")
+                traceback.print_exc(file=error_file)
+            
+            # Close all open windows and free memory
+            IJ.run("Close All")
+            IJ.freeMemory()
+            continue
 
-	#close out errorFile
-	errorFile = open(errorFilePath, "a")
-	errorFile.write("\nDone with script.\n")
-	errorFile.close()
-	
-run_it()
-print "Done with script"
+    # Move all existing folders into a new folder
+    scope_folder = os.path.join(input_dir, 'scope_folders')
+    if not os.path.exists(scope_folder):
+        os.mkdir(scope_folder)
+    for folder in os.listdir(input_dir):
+        folder_path = os.path.join(input_dir, folder)
+        if os.path.isdir(folder_path) and folder not in [scope_folder, 'processed']:
+            shutil.move(folder_path, scope_folder)
+
+    # Move all existing oif files into a new folder
+    for file in os.listdir(input_dir):
+        if file.endswith('.oif'):
+            file_path = os.path.join(input_dir, file)
+            shutil.move(file_path, os.path.join(scope_folder, file))
+
+    # Close the error log file
+    with open(error_file_path, "a") as error_file:
+        error_file.write("\nDone with script.\n")
+        
+    print "Done with script"
+
+run_it(input_dir)
