@@ -159,6 +159,7 @@ def make_MAX(singleplane, save_folder):
             IJ.run(imp, "Z Project...", "projection=[Max Intensity] all") # Run Z projection and save MAX image
             max_imp = WindowManager.getImage("MAX_" + title)
             windowName = max_imp.getTitle()
+            windowName = windowName.replace(".oif.files", "")
             IJ.saveAsTiff(max_imp, os.path.join(save_folder, windowName))
             imp = WindowManager.getImage(title)
             imp.changes = False # Answers "no" to the dialog asking if you want to save any changes
