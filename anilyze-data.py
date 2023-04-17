@@ -1,8 +1,8 @@
 # @File(label = "Input directory", style = "directory") input_dir
 
 """
-AUTHOR: Ani Michaud (Varjabedian)
-DESCRIPTION: This branch of code is a simplified version of Anilyzer. Its primary function is to open hyperstacks, perform a maximum projection on all images, and save the output in a designated folder.
+AUTHOR: Ani Michaud (Varjabedian) / Dominic Chomchai
+DESCRIPTION: This branch of code is a based on the Anilyzer. Its primary function is to open hyperstacks, perform a maximum projection on all images, and save the output in a designated folder.
 
 The code is organized in the following manner:
 
@@ -14,6 +14,9 @@ The code is organized in the following manner:
 To understand the overall flow of events, check the order of calls in the "run_it()" function. If you wish to skip certain steps, you can comment them out in the "run_it()" function, but please note that some functions pass arguments to each other, so commenting out specific functions may result in errors. It's best to read the individual function before commenting it out to avoid any potential errors.
 
 For more information and the latest updates, please visit the GitHub repository at: https://github.com/anivarj/anilyzer.
+
+Update 230417: Dom modified the script to make it more readable and to remove superfluous code. Dom also added functionality to 
+detect whether the imported images are single Z-stacks (with no time element), and import those correctly.
 """
 import os
 import glob
@@ -70,60 +73,103 @@ def list_scans(input_dir, microscope_type):
 
 def load_initiator_file(input_dir, scan, microscope_type, basename):
     """
-    Load the initiator file for a given scan, based on the microscope type.
-    For Olympus microscopes, the initiator file is the .oif file.
-    For Bruker microscopes, the initiator file is the first TIF file in the directory.
+    Load the initiator file for a given microscope type and determine the image type.
 
     Args:
-    - scan (str): The path to the scan directory.
-    - microscope_type (str): The type of microscope used to acquire the scan.
-    - basename (str): The basename of the scan.
+        input_dir (str): The input directory.
+        scan (str): The scan directory for Bruker microscope type.
+        microscope_type (str): The type of microscope, either "Olympus" or "Bruker".
+        basename (str): The basename of the file for Olympus microscope type.
+
+    Raises:
+        TypeError: If the microscope type is unknown.
 
     Returns:
-    - initiator_file_path (str): The path to the initiator file.
+        A tuple containing the initiator file path and the image type, either "t-series" or "z-stack".
     """
     if microscope_type == "Olympus":
         # Use the .oif file as initiator
         initiator_file_name = os.path.splitext(basename)[0]
         initiator_file_path = os.path.join(input_dir, initiator_file_name)
+
+        # Determine if the image type is a t-series or z-stack
+        target_folder_name = initiator_file_path.split('/')[-1] + ".files"
+        target_folder_path = os.path.join(input_dir, target_folder_name)
+
+        # Check the name of the first .tif file to determine the image type
+        target_folder_scan_list = [file for file in os.listdir(target_folder_path) if file.endswith(".tif")]
+        first_file = target_folder_scan_list[0]
+  
+        # assign the image type
+        if "T" in first_file.split('/')[-1]:
+            image_type = "t-series"
+        else:
+            image_type = "z-stack"
+
     elif microscope_type == "Bruker":
         # Use the first TIF file as initiator
         initiator_file_name = basename + "_Cycle00001_Ch?_000001.ome.tif"
         initiator_file_path = glob.glob(os.path.join(scan, initiator_file_name))
-        if not initiator_file_path:
-            raise TypeError("No initiator file found for " + basename)
         initiator_file_path = initiator_file_path[0]
+
+        # Determine if the image type is a t-series or z-stack
+        target_folder_scan_list = [file for file in os.listdir(scan) if file.endswith(".tif")]
+
+        # Check the name of the last .tif file to determine the image type
+        last_file = target_folder_scan_list[-1]
+        last_file = last_file.split('/')[-1]
+        cycle_part = last_file.split('_')[-3]
+
+        # assign the image type
+        if int(cycle_part[5:]) != 1:
+            image_type = "t-series"
+        else:
+            image_type = "z-stack"
+
     else:
         raise TypeError("Unknown microscope type " + microscope_type)
-    return initiator_file_path
+        
+    return initiator_file_path, image_type
 
-def make_hyperstack(initiator_file_path, basename):
+def make_hyperstack(initiator_file_path, basename, image_type, save_folder):
     """
-    Create a hyperstack from the initiator file using ImageJ and Bio-Formats.
+    Convert the initiator file to a hyperstack and save it as a TIFF file.
 
     Args:
-    - initiator_file_path (str): The path to the initiator file.
-    - basename (str): The basename of the scan.
+        initiator_file_path (str): The path to the initiator file.
+        basename (str): The basename of the file.
+        image_type (str): The type of the image, either "t-series" or "z-stack".
+        save_folder (str): The folder where the hyperstack will be saved.
+
+    Raises:
+        Exception: If there are no windows open or more than one window is open.
 
     Returns:
-    None.
+        None.
     """
-    # Import the initiator file as a hyperstack using Bio-Formats
-    IJ.run("Bio-Formats Importer", "open=[" + initiator_file_path + "] color_mode=Grayscale concatenate_series open_all_series quiet rois_import=[ROI manager] view=Hyperstack stack_order=XYCZT")
-    
-    # Check to see if multiple windows are open. 
-    image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
-    if len(image_titles) > 1:
-        for i in image_titles:
-            imp = WindowManager.getImage(i)
-            if imp.getNFrames() == 1: # If it is a single frame, close it (because it sees them as partial slices)
-                imp.close()
+    if image_type == "z-stack":
+        IJ.run("Bio-Formats Importer", "open=[" + initiator_file_path + "] color_mode=Grayscale concatenate_series open_all_series quiet rois_import=[ROI manager] view=Hyperstack stack_order=XYCTZ")
+        imp = IJ.getImage()
+        windowName = imp.getTitle()
+        IJ.saveAsTiff(imp, os.path.join(save_folder,windowName))
+
+    else:
+        # Import the initiator file as a hyperstack using Bio-Formats
+        IJ.run("Bio-Formats Importer", "open=[" + initiator_file_path + "] color_mode=Grayscale concatenate_series open_all_series quiet rois_import=[ROI manager] view=Hyperstack stack_order=XYCZT")
+        
+        # Check to see if multiple windows are open. 
         image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
-        if len(image_titles) != 1:
-            raise Exception("No windows open! Is this a single slice acquisition?")
-    
-    imp = IJ.getImage()
-    imp.setTitle(basename + "_raw.tif")
+        if len(image_titles) > 1:
+            for i in image_titles:
+                imp = WindowManager.getImage(i)
+                if imp.getNFrames() == 1: # If it is a single frame, close it (because it sees them as partial slices)
+                    imp.close()
+            image_titles = [WindowManager.getImage(id).getTitle() for id in WindowManager.getIDList()]
+            if len(image_titles) != 1:
+                raise Exception("No windows open! Is this a single slice acquisition?")
+        
+        imp = IJ.getImage()
+        imp.setTitle(basename + "_raw.tif")
 
 def single_plane_check():
     '''
@@ -205,12 +251,13 @@ def run_it(input_dir):
                 error_file.write("\n \n -- Processing " + basename + " --" + "\n")
 
             # Load initiator file and create hyperstack
-            initiator_file_path = load_initiator_file(input_dir, scan, microscope_type, basename)
-            make_hyperstack(initiator_file_path, basename)
+            initiator_file_path, image_type = load_initiator_file(input_dir, scan, microscope_type, basename)
+            make_hyperstack(initiator_file_path, basename, image_type, save_folder)
 
-            # Create MAX projection and save as TIFF file
-            singleplane = single_plane_check()
-            make_MAX(singleplane, save_folder)
+            # Create MAX projection and save as TIFF file if it is not singleplane or single z-stack
+            if image_type == "t-series":
+                singleplane = single_plane_check()
+                make_MAX(singleplane, save_folder)
 
             # Close all open windows and free memory
             IJ.run("Close All")
