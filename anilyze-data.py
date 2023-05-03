@@ -2,16 +2,20 @@
 
 """
 AUTHOR: Ani Michaud (Varjabedian) / Dominic Chomchai
-DESCRIPTION: This branch of code is a based on the Anilyzer. Its primary function is to open hyperstacks, perform a maximum projection on all images, and save the output in a designated folder.
+DESCRIPTION: This branch of code is a based on the Anilyzer. Its primary function is to open hyperstacks, 
+perform a maximum projection on all images, and save the output in a designated folder.
 
 The code is organized in the following manner:
 
     Script parameters are located at the top, preceded by a "#@" symbol, to gather information for the dialogue box.
     Import statements for all necessary modules are included.
     The main functions for processing data are defined.
-    The "run_it()" function is implemented, which sets up error logging and calls all the other processing functions. This function should eventually be moved to its own file, but for now, it is kept in the same file for ease of access.
+    The "run_it()" function is implemented, which sets up error logging and calls all the other processing functions. 
+        This function should eventually be moved to its own file, but for now, it is kept in the same file for ease of access.
 
-To understand the overall flow of events, check the order of calls in the "run_it()" function. If you wish to skip certain steps, you can comment them out in the "run_it()" function, but please note that some functions pass arguments to each other, so commenting out specific functions may result in errors. It's best to read the individual function before commenting it out to avoid any potential errors.
+To understand the overall flow of events, check the order of calls in the "run_it()" function. If you wish to skip certain steps, 
+you can comment them out in the "run_it()" function, but please note that some functions pass arguments to each other, so commenting 
+out specific functions may result in errors. It's best to read the individual function before commenting it out to avoid any potential errors.
 
 For more information and the latest updates, please visit the GitHub repository at: https://github.com/anivarj/anilyzer.
 
@@ -151,7 +155,7 @@ def make_hyperstack(initiator_file_path, basename, image_type, save_folder):
         IJ.run("Bio-Formats Importer", "open=[" + initiator_file_path + "] color_mode=Grayscale concatenate_series open_all_series quiet rois_import=[ROI manager] view=Hyperstack stack_order=XYCTZ")
         imp = IJ.getImage()
         windowName = imp.getTitle()
-        IJ.saveAsTiff(imp, os.path.join(save_folder,windowName))
+        IJ.saveAsTiff(imp, os.path.join(save_folder,basename + ".tif"))
 
     else:
         # Import the initiator file as a hyperstack using Bio-Formats
