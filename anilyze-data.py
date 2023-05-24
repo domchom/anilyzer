@@ -205,7 +205,7 @@ def make_MAX(singleplane, save_folder):
     for title in image_titles:
         imp = WindowManager.getImage(title)
         
-        if singleplane == False:
+        if singleplane == False: #Change to True if want to save the whole hyperstack (see other note below)
             IJ.run(imp, "Z Project...", "projection=[Max Intensity] all") # Run Z projection and save MAX image
             max_imp = WindowManager.getImage("MAX_" + title)
             windowName = max_imp.getTitle()
@@ -217,6 +217,9 @@ def make_MAX(singleplane, save_folder):
         
         else:
             windowName = imp.getTitle()
+            # uncomment below if want to save entire hyperstack (see other note above)
+            # windowName = windowName.replace(".oif.files", "")
+            # IJ.saveAsTiff(imp, os.path.join(save_folder, windowName))
             print "Single plane data detected. Skipping Z-projection for ", windowName
 
 
