@@ -29,6 +29,8 @@ import datetime
 import traceback
 from ij import IJ, WindowManager
 
+save_max_projection = False
+
 # Convert input directory to string
 input_dir = str(input_dir)
 
@@ -205,7 +207,7 @@ def make_MAX(singleplane, save_folder):
     for title in image_titles:
         imp = WindowManager.getImage(title)
         
-        if singleplane == False: #Change to True if want to save the whole hyperstack (see other note below)
+        if singleplane == False and save_max_projection == True: 
             IJ.run(imp, "Z Project...", "projection=[Max Intensity] all") # Run Z projection and save MAX image
             max_imp = WindowManager.getImage("MAX_" + title)
             windowName = max_imp.getTitle()
@@ -214,12 +216,16 @@ def make_MAX(singleplane, save_folder):
             imp = WindowManager.getImage(title)
             imp.changes = False # Answers "no" to the dialog asking if you want to save any changes
             imp.close() # Closes the hyperstack
+            print "Saving Max Projection for ", windowName
+            
+        elif singleplane == False and save_max_projection == False:
+            windowName = imp.getTitle()
+            windowName = windowName.replace(".oif.files", "")
+            IJ.saveAsTiff(imp, os.path.join(save_folder, windowName))
+            print "Saving hyperstack for ", windowName
         
         else:
             windowName = imp.getTitle()
-            # uncomment below if want to save entire hyperstack (see other note above)
-            # windowName = windowName.replace(".oif.files", "")
-            # IJ.saveAsTiff(imp, os.path.join(save_folder, windowName))
             print "Single plane data detected. Skipping Z-projection for ", windowName
 
 
