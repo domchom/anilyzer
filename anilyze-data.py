@@ -29,7 +29,7 @@ import datetime
 import traceback
 from ij import IJ, WindowManager
 
-save_max_projection = False
+save_max_projection = True
 
 # Convert input directory to string
 input_dir = str(input_dir)
